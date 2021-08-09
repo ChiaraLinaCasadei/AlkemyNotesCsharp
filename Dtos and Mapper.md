@@ -1,5 +1,3 @@
-# AlkemyNotesCsharp
-
 # DTOs y Mapping
 
 Creamos nuestro mapper, una clase a la que llamaremos "EntityMapper". Allí irán los métodos que pasen de una clase (model) a DTO. O viceversa.
