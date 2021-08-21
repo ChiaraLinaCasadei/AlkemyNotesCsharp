@@ -1,4 +1,4 @@
-# Incorporando Amazon Web Services al proyecto
+# Incorporando Amazon Web Services al proyecto (para alojar imagenes)
 
 1) Instalar paquetes NuGet:
   - AWSSDK.S3 (S3 es el protocolo que usa para subir los archivos)
@@ -156,4 +156,125 @@
             }
         }
     }
+```
+
+4) Ahora que tenemos el Helper creado, podemos utilizarlo en un servicio exclusivo para las imagenes, con su correspondiente interfaz. 
+   Este servicio se encarga de guardar una imagen (recibiendo el nombre del archivo, y el archivo en sí). Si la imagen existe (el usuario la proporcionó), entonces la valida (debe ser formato aceptado), si no pasa la validación arroja una excepcion. Si no existe, arroja una excepción diferente. Los errores que pueden darse durante la subida de imagen, es que la imagen no exista, o que el formato sea inválido.
+   Para borrar la imagen, primero tiene que existir, y eso es lo que valida el método, luego recurre a metodos ya incluidos en la instancia del helper de amazon, debe recibir el nombre del archivo.
+
+```
+  public class ImageService : IImagenService
+    {
+        private S3AwsHelper _s3AwsHelper;
+
+        public ImageService()
+        {
+            _s3AwsHelper = new S3AwsHelper();
+        }
+
+        public async Task<String> Save(string fileName, IFormFile image)
+        {
+            AwsManagerResponse responseAws;
+            if (image != null)
+            {
+                if (ValidateFiles.ValidateImage(image))
+                {
+                    responseAws = await _s3AwsHelper.AwsUploadFile(fileName, image);
+                    if (!String.IsNullOrEmpty(responseAws.Errors))
+                    {
+                        throw new Exception("Error en al guardar imagen. Detalle:" + responseAws.Errors);
+                    }
+
+                    return responseAws.Url;
+                }
+                else
+                    throw new Exception("Extensión de imagen no válida. Debe ser jpg, png o jpeg.");
+            }
+            else
+                throw new Exception("Error, no existe imagen.");
+        }
+
+        public async Task<bool> Delete(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+            else
+            {
+                string nameImage = await _s3AwsHelper.GetKeyFromUrl(name);
+                AwsManagerResponse responseAws = await _s3AwsHelper.AwsFileDelete(nameImage);
+                if (!String.IsNullOrEmpty(responseAws.Errors))
+                    return false;
+
+                return true;
+            }
+            
+
+        }
+       
+    }
+
+```
+
+  5) ¿Cómo validamos las imagenes en el servicio de imagenes?
+  INCLUIR EXPLICACIÓN
+
+```
+  public class ValidateFiles
+    {
+        private static readonly Dictionary<string, List<byte[]>> _fileSignature =
+        new Dictionary<string, List<byte[]>>
+        {
+            { ".jpeg", new List<byte[]>
+                {
+                    new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 },
+                    new byte[] { 0xFF, 0xD8, 0xFF, 0xE2 },
+                    new byte[] { 0xFF, 0xD8, 0xFF, 0xE3 },
+                }
+            },
+            { ".png", new List<byte[]>
+                {
+                    new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A },
+                }
+            },
+        };
+
+        public static string GetImageExtensionFromFile(byte[] file)
+        {
+            MemoryStream stream = new MemoryStream(file);
+            using (var reader = new BinaryReader(stream))
+            {
+                Dictionary<string, List<byte[]>>.KeyCollection keyColl = _fileSignature.Keys;
+                foreach (var ext in keyColl)
+                {
+                    var signatures = _fileSignature[ext];
+                    var headerBytes = reader.ReadBytes(signatures.Max(m => m.Length));
+                    bool verification = signatures.Any(signature => headerBytes.Take(signature.Length).SequenceEqual(signature));
+                    if (verification)
+                    {
+                        reader.Close();
+                        stream.Close();
+                        return ext;
+                    }
+                    stream.Seek(0, SeekOrigin.Begin);
+                }
+            }
+            stream.Close();
+            throw new InvalidDataException();
+        }
+
+        public static bool ValidateImage(IFormFile image)
+        {
+            var postedFileExtension = Path.GetExtension(image.FileName);
+            if (!string.Equals(postedFileExtension, ".jpg", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(postedFileExtension, ".png", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(postedFileExtension, ".jpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+
 ```
