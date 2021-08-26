@@ -1,6 +1,6 @@
-# Authentication
+# Authorization
 Se agrega como servicio, pero con su propia sección, para distinguirlo de los servicios de los modelos.
-Hay endpoints a los que solo puede acceder alguien que se encuentra registrado en la base de datos de usuarios de la página, para eso requiero de una autenticación, para mas seguridad.
+Hay endpoints a los que solo puede acceder alguien que se encuentra registrado en la base de datos de usuarios de la página, para eso requiero de una autorización, para mas seguridad.
 
 JWT: Cada usuario tiene un Token asignado, que es único y se genera cada vez que el usuario se loggea. Ese token está asociado a un rol de usuario.
 SendGrid: En esta api en particular, tambien utilizo un servicio de envío de emails, para el caso de envío de un mail de bienvenida cuando alguien se registra como usuario
@@ -85,6 +85,10 @@ SendGrid: En esta api en particular, tambien utilizo un servicio de envío de em
 
             return null;
         }
+        
+        /*A partir de los datos del usuario, se genera un token unico personalizado, que no solo sirve para identificar al usuario, sino tambien el rol del mismo
+        eso permite que, al entrar a un endpoint que requiere que rol sea admin, no permita el acceso a otro usuario que no tenga dicho rol*/
+        
         public string GetToken(UserModel user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -100,11 +104,13 @@ SendGrid: En esta api en particular, tambien utilizo un servicio de envío de em
                 };
 
             var authSigningKey = new SymmetricSecurityKey(key);
+            
+            /*tambien se le agrega la expiracion del token y se encripta con la clave secreta que tenemos en la configuracion.  */
 
             var token = new JwtSecurityToken(
                 expires: DateTime.Now.AddHours(1),
                 claims: authClaims,
-                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256) //Se encripta con sha256
                 );
 
             return tokenHandler.WriteToken(token);
