@@ -169,7 +169,7 @@ En appsettings.json es donde se agrega la clave secreta
 
   },
   "JWT": {
-    "Secret": "ByYM000OLlMQG6VVVp1OH7Xzyr7gHuw1qvUC5dcGt3SNM"
+    "Secret": "acá va la clave secreta"
   },
 ```
 
